@@ -22,9 +22,8 @@ func Run(c *cli.Context) error {
 	}
 
 	router := httprouter.New()
-	for path, route := range config.Routes {
-		route.Config = config
-		router.Handle(route.LookupMethod(), path, route.Execute)
+	for _, route := range config.Routes {
+		router.Handle(route.Method, route.Path, route.Execute)
 	}
 
 	return http.ListenAndServe(":8080", router)

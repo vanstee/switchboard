@@ -2,6 +2,7 @@ package switchboard
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -24,6 +25,19 @@ type Streams struct {
 type LocalDriver struct{}
 type BashDriver struct{}
 type DockerDriver struct{}
+
+func LookupDriver(name string) (Driver, error) {
+	switch name {
+	case "local":
+		return LocalDriver{}, nil
+	case "bash":
+		return BashDriver{}, nil
+	case "docker":
+		return DockerDriver{}, nil
+	default:
+		return nil, fmt.Errorf("driver \"%s\" not found", name)
+	}
+}
 
 func (driver LocalDriver) Execute(command *Command, env []string, streams *Streams) error {
 	cmd := exec.Command(command.Command)

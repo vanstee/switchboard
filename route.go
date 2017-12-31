@@ -2,9 +2,7 @@ package switchboard
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 
@@ -12,52 +10,23 @@ import (
 )
 
 type Route struct {
-	Method    string            `yaml:"method"`
-	Command   interface{}       `yaml:"command"`
-	RouteType string            `yaml:"type"`
-	Routes    map[string]*Route `yaml:"routes"`
-	Config    *Config
+	Path    string
+	Command *Command
+	Method  string
+	Type    string
+	Routes  map[string]*Route
 }
 
 func (route *Route) Execute(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	command, err := route.LookupCommand(route.Config)
-	if err != nil {
-		log.Printf("error looking up command for route: %s\n", err)
-		return
-	}
-
 	env := requestToEnv(r)
 	var stdout, stderr bytes.Buffer
-	err = command.Execute(env, &Streams{r.Body, &stdout, &stderr})
+	err := route.Command.Execute(env, &Streams{r.Body, &stdout, &stderr})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	fmt.Fprintf(w, stdout.String())
-}
-
-func (route *Route) LookupMethod() string {
-	method := "GET"
-	if route.Method != "" {
-		method = route.Method
-	}
-	return method
-}
-
-func (route *Route) LookupCommand(config *Config) (*Command, error) {
-	switch command := route.Command.(type) {
-	case string:
-		c, ok := config.Commands[command]
-		if !ok {
-			return nil, fmt.Errorf("command \"%s\" not found", c)
-		}
-		return c, nil
-	case *Command:
-		return command, nil
-	default:
-		return nil, errors.New("command for route malformed")
-	}
 }
 
 func requestToEnv(r *http.Request) []string {
