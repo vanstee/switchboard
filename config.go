@@ -2,6 +2,7 @@ package switchboard
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 
 	"gopkg.in/yaml.v2"
@@ -36,8 +37,8 @@ type RouteYAML struct {
 	Routes  map[string]*RouteYAML `yaml:"routes"`
 }
 
-func ParseConfig(path string) (*Config, error) {
-	b, err := ioutil.ReadFile(path)
+func ParseConfig(r io.Reader) (*Config, error) {
+	b, err := ioutil.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}
