@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -41,7 +42,30 @@ func LookupDriver(name string) (Driver, error) {
 }
 
 func (driver LocalDriver) Execute(command *Command, env []string, streams *Streams) (int64, error) {
-	cmd := exec.Command("/bin/bash", "-c", command.Command)
+	path := command.Command
+	if command.Inline != "" {
+		tmpfile, err := ioutil.TempFile("", "switchboard-inline-command")
+		if err != nil {
+			return -1, err
+		}
+		defer os.Remove(tmpfile.Name())
+
+		if _, err := tmpfile.Write([]byte(command.Inline)); err != nil {
+			log.Fatal(err)
+		}
+
+		if err := tmpfile.Close(); err != nil {
+			log.Fatal(err)
+		}
+
+		if err := os.Chmod(tmpfile.Name(), 0777); err != nil {
+			log.Fatal(err)
+		}
+
+		path = tmpfile.Name()
+	}
+
+	cmd := exec.Command("/bin/bash", "-c", path)
 	cmd.Env = append(os.Environ(), env...)
 	cmd.Stdin = streams.Stdin
 	cmd.Stdout = streams.Stdout

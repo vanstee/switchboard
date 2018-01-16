@@ -18,6 +18,7 @@ type Command struct {
 	Command string
 	Driver  Driver
 	Image   string
+	Inline  string
 }
 
 func (command *Command) Execute(env []string, stdin io.Reader) (int64, map[string][]string, io.Reader, error) {

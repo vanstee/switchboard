@@ -28,6 +28,7 @@ type CommandYAML struct {
 	Command string `yaml:"command"`
 	Driver  string `yaml:"driver"`
 	Image   string `yaml:"image"`
+	Inline  string `yaml:"inline"`
 }
 
 type RouteYAML struct {
@@ -100,6 +101,7 @@ func (commandYAML *CommandYAML) ToCommand(name string) (*Command, error) {
 	command.Driver = driver
 	command.Command = commandYAML.Command
 	command.Image = commandYAML.Image
+	command.Inline = commandYAML.Inline
 
 	return command, nil
 }
@@ -137,6 +139,7 @@ func (routeYAML *RouteYAML) ToRoute(path string, commands map[string]*Command) (
 			Command: cs["command"],
 			Driver:  cs["driver"],
 			Image:   cs["image"],
+			Inline:  cs["inline"],
 		}
 
 		command, err := commandYAML.ToCommand(path)
