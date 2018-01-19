@@ -22,12 +22,10 @@ type Route struct {
 	Routes  map[string]*Route
 }
 
-type Handle func([]string, io.Reader) (int64, map[string][]string, io.Reader, error)
-
 func BuildRouter(config *Config) (*httprouter.Router, error) {
 	router := httprouter.New()
 	for _, route := range config.Routes {
-		err := BuildRoute(router, route, []Handle{})
+		err := BuildRoute(router, route, []*Route{})
 		if err != nil {
 			return nil, err
 		}
@@ -35,18 +33,18 @@ func BuildRouter(config *Config) (*httprouter.Router, error) {
 	return router, nil
 }
 
-func BuildRoute(router *httprouter.Router, route *Route, handles []Handle) error {
+func BuildRoute(router *httprouter.Router, route *Route, pipeline []*Route) error {
 	if len(route.Routes) == 0 {
 		log.Printf("routing to %s %s", route.Method, route.Path)
-		handles = append(handles, route.Command.Execute)
-		router.Handle(route.Method, route.Path, HandlePipeline(handles))
+		pipeline = append(pipeline, route)
+		router.Handle(route.Method, route.Path, ExecutePipeline(pipeline))
 	} else {
-		log.Printf("inserting middleware %s %s", route.Method, route.Path)
-		handles = append(handles, route.Command.Execute)
+		log.Printf("inserting route in pipeline %s %s", route.Method, route.Path)
+		pipeline = append(pipeline, route)
 		for _, child := range route.Routes {
-			childHandles := make([]Handle, len(handles))
-			copy(childHandles, handles)
-			err := BuildRoute(router, child, childHandles)
+			childPipeline := make([]*Route, len(pipeline))
+			copy(childPipeline, pipeline)
+			err := BuildRoute(router, child, childPipeline)
 			if err != nil {
 				return err
 			}
@@ -55,15 +53,16 @@ func BuildRoute(router *httprouter.Router, route *Route, handles []Handle) error
 	return nil
 }
 
-func HandlePipeline(handles []Handle) httprouter.Handle {
+func ExecutePipeline(pipeline []*Route) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 		log.Printf("handling route %s", r.URL.Path)
 		env := RequestToEnv(r)
 		tags := make(map[string][]string)
 		stdin := io.Reader(r.Body)
 
-		for _, handle := range handles {
-			status, routeTags, stdout, err := handle(env, stdin)
+		for _, route := range pipeline {
+			log.Printf("executing command for route %s", route.Path)
+			status, routeTags, stdout, err := route.Command.Execute(env, stdin)
 			if err != nil {
 				log.Print("failed to execute command")
 				http.Error(w, err.Error(), http.StatusInternalServerError)
