@@ -51,15 +51,15 @@ func (driver LocalDriver) Execute(command *Command, env []string, streams *Strea
 		defer os.Remove(tmpfile.Name())
 
 		if _, err := tmpfile.Write([]byte(command.Inline)); err != nil {
-			log.Fatal(err)
+			return -1, err
 		}
 
 		if err := tmpfile.Close(); err != nil {
-			log.Fatal(err)
+			return -1, err
 		}
 
 		if err := os.Chmod(tmpfile.Name(), 0777); err != nil {
-			log.Fatal(err)
+			return -1, err
 		}
 
 		path = tmpfile.Name()

@@ -1,0 +1,39 @@
+commands:
+  authenticate:
+    inline: |
+      #!/usr/bin/env bash
+
+      if [ "$HTTP_HEADER_AUTHORIZATION" != "secret" ]; then
+        cat <<EOF
+      HALT: true
+      HTTP_STATUS_CODE: 401
+      HTTP_CONTENT_TYPE: application/json
+
+      { "error": "Unauthorized" }
+      EOF
+
+        exit
+      fi
+
+      cat <<EOF
+      ENV_SET: CURRENT_USER_ID=1
+
+      EOF
+
+      cat <&0
+  user:
+    inline: |
+      #/usr/bin/env bash
+
+      cat <<EOF
+      HTTP_STATUS_CODE: 200
+      HTTP_CONTENT_TYPE: application/json
+
+      { "user": { "id": ${CURRENT_USER_ID} } }
+      EOF
+routes:
+  "*":
+    command: authenticate
+    routes:
+      "/user":
+        command: user

@@ -7,8 +7,6 @@ import (
 	"os"
 
 	"github.com/urfave/cli"
-
-	"github.com/julienschmidt/httprouter"
 )
 
 func Run(c *cli.Context) error {
@@ -26,10 +24,10 @@ func Run(c *cli.Context) error {
 		return cli.NewExitError(message, 1)
 	}
 
-	router := httprouter.New()
-	for _, route := range config.Routes {
-		log.Printf("routing to %s %s", route.Method, route.Path)
-		router.Handle(route.Method, route.Path, route.Execute)
+	router, err := BuildRouter(config)
+	if err != nil {
+		message := fmt.Sprintf("error building routes: %s", err)
+		return cli.NewExitError(message, 1)
 	}
 
 	port := c.Int("port")

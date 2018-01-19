@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"path"
 
 	"gopkg.in/yaml.v2"
 )
@@ -166,7 +167,28 @@ func (routeYAML *RouteYAML) ToRoute(path string, commands map[string]*Command) (
 
 	route.Type = routeType
 
-	// TODO: Parse routes for middleware
+	route.Routes = make(map[string]*Route)
+	for childPath, childRouteYAML := range routeYAML.Routes {
+		path := JoinPaths("/", path, childPath)
+		r, err := childRouteYAML.ToRoute(path, commands)
+		if err != nil {
+			return nil, err
+		}
+		route.Routes[childPath] = r
+	}
 
 	return route, nil
+}
+
+func JoinPaths(paths ...string) string {
+	segments := make([]string, 0, len(paths))
+	for _, path := range paths {
+		switch path {
+		case "*":
+			continue
+		default:
+			segments = append(segments, path)
+		}
+	}
+	return path.Join(segments...)
 }

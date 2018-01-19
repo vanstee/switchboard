@@ -34,7 +34,6 @@ func (command *Command) Execute(env []string, stdin io.Reader) (int64, map[strin
 		return -1, nil, nil, err
 	}
 
-	log.Print("parsing tags")
 	tags, rest, err := ParseTags(&stdout)
 	if err != nil {
 		return -1, nil, nil, err
@@ -64,6 +63,9 @@ func (command *Command) Execute(env []string, stdin io.Reader) (int64, map[strin
 //   HTTP_REDIRECT
 //   Sets the status code to 303 and the Location header
 //
+//   DEBUG
+//   Logs to STDOUT
+//
 func ParseTags(stdout io.Reader) (map[string][]string, io.Reader, error) {
 	tags := make(map[string][]string)
 	scanner := bufio.NewScanner(stdout)
@@ -75,18 +77,15 @@ func ParseTags(stdout io.Reader) (map[string][]string, io.Reader, error) {
 		matches := isTag.FindStringSubmatch(line)
 
 		if len(matches) > 0 {
-			log.Printf("found tag %s", matches[1])
+			log.Printf("tag found %s=%s", matches[1], matches[2])
 			tags[matches[1]] = append(tags[matches[1]], matches[2])
 		} else if line == "" {
-			log.Print("hit end of tags")
 			isHeader = false
 		} else if isHeader && len(tags) > 0 {
-			log.Print("hit unexpected end of tags")
 			return nil, nil, errors.New("tags and output must be separated with a blank line")
 		} else if !isHeader {
 			rest.Write(append(scanner.Bytes(), byte('\n')))
 		} else {
-			log.Print("no tags found")
 			rest.Write(append(scanner.Bytes(), byte('\n')))
 			isHeader = false
 		}
