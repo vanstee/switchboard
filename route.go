@@ -18,7 +18,6 @@ type Route struct {
 	Path    string
 	Command *Command
 	Method  string
-	Type    string
 	Routes  map[string]*Route
 }
 

@@ -23,7 +23,6 @@ HTTP_STATUS_CODE: 201
 			},
 		},
 		Method: "POST",
-		Type:   "route",
 	}
 
 	req := httptest.NewRequest(
@@ -33,7 +32,7 @@ HTTP_STATUS_CODE: 201
 	)
 	w := httptest.NewRecorder()
 
-	route.Execute(w, req, make(httprouter.Params, 0))
+	switchboard.ExecutePipeline([]*switchboard.Route{route})(w, req, make(httprouter.Params, 0))
 
 	resp := w.Result()
 	if resp.StatusCode != 201 {

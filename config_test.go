@@ -7,51 +7,86 @@ import (
 	"github.com/vanstee/switchboard"
 )
 
-func TestParseConfig(t *testing.T) {
-	body := `
+var (
+	helloCommand = &switchboard.Command{
+		Name:    "hello",
+		Command: "echo hello",
+		Driver:  switchboard.LocalDriver{},
+		Image:   "",
+		Inline:  "",
+	}
+
+	configTests = []struct {
+		body     string
+		commands map[string]*switchboard.Command
+		routes   map[string]*switchboard.Route
+	}{
+		{
+			body: `
 commands:
- 	hello:
-    command: "echo hello"
+	hello:
+		command: "echo hello"
 routes:
-  "/hello":
-    command: hello`
+	"/hello":
+		command: hello`,
+			commands: map[string]*switchboard.Command{
+				"hello": helloCommand,
+			},
+			routes: map[string]*switchboard.Route{
+				"/hello": &switchboard.Route{
+					Path:    "/hello",
+					Command: helloCommand,
+					Method:  "GET",
+					Routes:  nil,
+				},
+			},
+		},
+	}
+)
 
-	body = strings.Replace(body, "\t", "  ", -1)
+func TestParseConfig(t *testing.T) {
+	for _, tt := range configTests {
+		body := strings.Replace(tt.body, "\t", "  ", -1)
 
-	config, err := switchboard.ParseConfig(strings.NewReader(body))
-	if err != nil {
-		t.Fatalf("ParseConfig returned an error: %s", err)
-	}
+		config, err := switchboard.ParseConfig(strings.NewReader(body))
+		if err != nil {
+			t.Fatalf("ParseConfig returned an error: %s", err)
+		}
 
-	commands := config.Commands
-	if len(commands) != 1 {
-		t.Fatalf("expected %d commands, got %d commands", 1, len(commands))
-	}
+		commands := config.Commands
+		if len(commands) != len(tt.commands) {
+			t.Fatalf("expected %d commands, got %d commands", len(tt.commands), len(commands))
+		}
 
-	command, ok := commands["hello"]
-	if !ok {
-		t.Fatalf("command not found")
-	}
-	if command.Name != "hello" {
-		t.Errorf("expected command named %s, got command named %s", "hello", command.Name)
-	}
-	if command.Command != "echo hello" {
-		t.Errorf("expected command %s, got command %s", "echo hello", command.Command)
-	}
+		for name, ttcommand := range tt.commands {
+			command, ok := commands[name]
+			if !ok {
+				t.Fatalf("command %s not found", name)
+			}
+			if command.Name != ttcommand.Name {
+				t.Errorf("expected command named %s, got command named %s", ttcommand.Name, command.Name)
+			}
+			if command.Command != ttcommand.Command {
+				t.Errorf("expected command %s, got command %s", ttcommand.Command, command.Command)
+			}
+		}
 
-	routes := config.Routes
-	if len(routes) != 1 {
-		t.Fatalf("expected %d routes, got %d routes", 1, len(routes))
-	}
+		routes := config.Routes
+		if len(routes) != 1 {
+			t.Fatalf("expected %d routes, got %d routes", 1, len(routes))
+		}
 
-	route := routes["/hello"]
-	if !ok {
-		t.Fatal("route not found")
-	}
-	if route.Path != "/hello" {
-		t.Errorf("expected route %s, got route %s", "/hello", route.Path)
-	}
-	if route.Command.Name != "hello" {
-		t.Errorf("expected route to have command %s, got command %s", "hello", route.Command.Name)
+		for path, ttroute := range tt.routes {
+			route, ok := routes[path]
+			if !ok {
+				t.Fatal("route %s not found", path)
+			}
+			if route.Path != ttroute.Path {
+				t.Errorf("expected route %s, got route %s", ttroute.Path, route.Path)
+			}
+			if route.Command.Name != ttroute.Command.Name {
+				t.Errorf("expected route to have command %s, got command %s", ttroute.Command.Name, route.Command.Name)
+			}
+		}
 	}
 }

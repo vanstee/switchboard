@@ -12,7 +12,6 @@ import (
 const (
 	DefaultCommandDriverName = "local"
 	DefaultRouteMethod       = "GET"
-	DefaultRouteType         = "endpoint"
 )
 
 type Config struct {
@@ -35,7 +34,6 @@ type CommandYAML struct {
 type RouteYAML struct {
 	Command interface{}           `yaml:"command"`
 	Method  string                `yaml:"method"`
-	Type    string                `yaml:"type"`
 	Routes  map[string]*RouteYAML `yaml:"routes"`
 }
 
@@ -159,13 +157,6 @@ func (routeYAML *RouteYAML) ToRoute(path string, commands map[string]*Command) (
 	}
 
 	route.Method = method
-
-	routeType := DefaultRouteType
-	if routeYAML.Type != "" {
-		routeType = routeYAML.Type
-	}
-
-	route.Type = routeType
 
 	route.Routes = make(map[string]*Route)
 	for childPath, childRouteYAML := range routeYAML.Routes {
