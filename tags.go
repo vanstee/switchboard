@@ -109,6 +109,17 @@ func ApplyEndTags(tags Tags, w http.ResponseWriter) error {
 		case "HTTP_CONTENT_TYPE":
 			log.Print("setting content-type header")
 			w.Header().Set("Content-Type", value)
+		case "HTTP_REDIRECT":
+			log.Print("redirecting to %s", value)
+			w.Header().Set("Location", value)
+			w.WriteHeader(303)
+		}
+	}
+
+	// All other tags must be applied before HTTP_STATUS_CODE
+	for key, values := range tags {
+		value := values[len(values)-1]
+		switch key {
 		case "HTTP_STATUS_CODE":
 			log.Print("setting status code")
 			status, err := strconv.ParseInt(value, 10, 32)
@@ -116,10 +127,6 @@ func ApplyEndTags(tags Tags, w http.ResponseWriter) error {
 				return err
 			}
 			w.WriteHeader(int(status))
-		case "HTTP_REDIRECT":
-			log.Print("redirecting to %s", value)
-			w.Header().Set("Location", value)
-			w.WriteHeader(303)
 		}
 	}
 
