@@ -139,12 +139,7 @@ var (
 
 func TestExamples(t *testing.T) {
 	for _, test := range exampleTests {
-		config, err := switchboard.ReadConfig(test.path)
-		if err != nil {
-			t.Fatalf("ReadConfig returned an error: %s", err)
-		}
-
-		server, err := switchboard.NewServer(config, port)
+		server, err := switchboard.NewServer(test.path, port, false)
 		if err != nil {
 			t.Fatalf("NewServer returned an error: %s", err)
 		}

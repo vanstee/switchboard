@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"regexp"
 
 	"gopkg.in/yaml.v2"
 )
@@ -13,6 +14,12 @@ import (
 const (
 	DefaultCommandDriverName = "local"
 	DefaultRouteMethod       = "GET"
+)
+
+var (
+	onlyAlphanumericRegexp        = regexp.MustCompile("[^a-zA-Z0-9-]")
+	removeSurroundingDashesRegexp = regexp.MustCompile("(^-*)|(-*$)")
+	consolidateDashesRegexp       = regexp.MustCompile("-+")
 )
 
 type Config struct {
@@ -142,7 +149,8 @@ func (routeYAML *RouteYAML) ToRoute(path string, commands map[string]*Command) (
 			Inline:  cs["inline"],
 		}
 
-		command, err := commandYAML.ToCommand(path)
+		name := PathToName(path)
+		command, err := commandYAML.ToCommand(name)
 		if err != nil {
 			return nil, err
 		}
@@ -203,4 +211,12 @@ func JoinPaths(paths ...string) string {
 		}
 	}
 	return path.Join(segments...)
+}
+
+func PathToName(path string) string {
+	name := path
+	name = onlyAlphanumericRegexp.ReplaceAllString(name, "-")
+	name = removeSurroundingDashesRegexp.ReplaceAllString(name, "")
+	name = consolidateDashesRegexp.ReplaceAllString(name, "-")
+	return name
 }

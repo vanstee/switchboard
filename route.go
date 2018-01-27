@@ -35,7 +35,7 @@ func BuildRoute(router *httprouter.Router, route *Route, pipeline []*Route) erro
 		pl := make([]*Route, len(pipeline))
 		copy(pl, pipeline)
 
-		if route.Path != "*" {
+		if len(route.Routes) == 0 {
 			log.Printf("routing to %s %s", method, route.Path)
 			pl = append(pl, route)
 			router.Handle(method, route.Path, ExecutePipeline(pl))
@@ -99,7 +99,7 @@ func ExecuteRoute(route *Route, env []string, stdin io.Reader) (Tags, string, er
 	log.Printf("executing command %s for route %s", route.Command.Name, route.Path)
 	status, routeTags, stdout, err := route.Command.Execute(env, stdin)
 	if err != nil {
-		log.Print("failed to execute command")
+		log.Print("failed to execute command: %s", err)
 		return nil, "", err
 	}
 
