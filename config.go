@@ -24,7 +24,7 @@ var (
 
 type Config struct {
 	Commands map[string]*Command
-	Routes   map[string]*Route
+	Routes   map[string]Routable
 }
 
 type ConfigYAML struct {
@@ -68,7 +68,7 @@ func ParseConfig(r io.Reader) (*Config, error) {
 func (configYAML *ConfigYAML) ToConfig() (*Config, error) {
 	config := &Config{
 		Commands: make(map[string]*Command),
-		Routes:   make(map[string]*Route),
+		Routes:   make(map[string]Routable),
 	}
 
 	for name, commandYAML := range configYAML.Commands {
@@ -173,7 +173,7 @@ func (routeYAML *RouteYAML) ToRoute(path string, commands map[string]*Command) (
 		route.Methods = []string{DefaultRouteMethod}
 	}
 
-	route.Routes = make(map[string]*Route)
+	route.Routes = make(map[string]Routable)
 	for childPath, childRouteYAML := range routeYAML.Routes {
 		path := JoinPaths("/", path, childPath)
 		r, err := childRouteYAML.ToRoute(path, commands)

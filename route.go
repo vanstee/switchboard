@@ -1,6 +1,7 @@
 package switchboard
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -11,91 +12,45 @@ import (
 	"github.com/julienschmidt/httprouter"
 )
 
+type Routable interface {
+	AttachHandlers(*httprouter.Router, Pipeline) error
+	Handle([]string, io.Reader) (Tags, string, error)
+}
+
 type Route struct {
 	Path    string
 	Command *Command
 	Methods []string
 	Type    string
-	Routes  map[string]*Route
+	Routes  map[string]Routable
 }
 
-func BuildRouter(config *Config) (http.Handler, error) {
-	router := httprouter.New()
-	for _, route := range config.Routes {
-		err := BuildRoute(router, route, []*Route{})
-		if err != nil {
-			return nil, err
-		}
-	}
-	return router, nil
+type RootRoute struct {
+	Routes map[string]Routable
 }
 
-func BuildRoute(router *httprouter.Router, route *Route, pipeline []*Route) error {
+type Pipeline []Routable
+
+func (route *Route) AttachHandlers(router *httprouter.Router, pipeline Pipeline) error {
 	for _, method := range route.Methods {
-		pl := make([]*Route, len(pipeline))
-		copy(pl, pipeline)
-
 		if len(route.Routes) == 0 {
 			log.Printf("routing to %s %s", method, route.Path)
-			pl = append(pl, route)
-			router.Handle(method, route.Path, ExecutePipeline(pl))
+			router.Handle(method, route.Path, pipeline.Append(route).Handle)
 		} else {
 			log.Printf("inserting route in pipeline %s %s", method, route.Path)
-			pl = append(pl, route)
 			for _, child := range route.Routes {
-				err := BuildRoute(router, child, pl)
+				err := child.AttachHandlers(router, pipeline.Append(route))
 				if err != nil {
 					return err
 				}
 			}
 		}
 	}
+
 	return nil
 }
 
-func ExecutePipeline(pipeline []*Route) httprouter.Handle {
-	return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-		log.Printf("handling route %s", r.URL.Path)
-		env := RequestToEnv(r, params)
-		tags := make(Tags)
-		stdin := io.Reader(r.Body)
-
-		for _, route := range pipeline {
-			routeTags, body, err := ExecuteRoute(route, env, stdin)
-			if err != nil {
-				if body == "" {
-					body = err.Error()
-				}
-				http.Error(w, body, http.StatusInternalServerError)
-				return
-			}
-
-			halt, err := ApplyBetweenTags(routeTags, tags, &env)
-			if err != nil {
-				log.Print("failed to apply tags")
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-
-			stdin = strings.NewReader(body)
-
-			if halt {
-				break
-			}
-		}
-
-		err := ApplyEndTags(tags, w)
-		if err != nil {
-			log.Print("failed to apply tags")
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		io.Copy(w, stdin)
-	}
-}
-
-func ExecuteRoute(route *Route, env []string, stdin io.Reader) (Tags, string, error) {
+func (route *Route) Handle(env []string, stdin io.Reader) (Tags, string, error) {
 	log.Printf("executing command %s for route %s", route.Command.Name, route.Path)
 	status, routeTags, stdout, err := route.Command.Execute(env, stdin)
 	if err != nil {
@@ -115,6 +70,68 @@ func ExecuteRoute(route *Route, env []string, stdin io.Reader) (Tags, string, er
 	}
 
 	return routeTags, string(body), nil
+}
+
+func (route *RootRoute) AttachHandlers(router *httprouter.Router, pipeline Pipeline) error {
+	for _, child := range route.Routes {
+		child.AttachHandlers(router, pipeline.Copy())
+	}
+
+	return nil
+}
+
+func (route *RootRoute) Handle([]string, io.Reader) (Tags, string, error) {
+	return nil, "", errors.New("root route cannot be executed")
+}
+
+func (pipeline Pipeline) Handle(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+	log.Printf("handling route %s", r.URL.Path)
+	env := RequestToEnv(r, params)
+	tags := make(Tags)
+	stdin := io.Reader(r.Body)
+
+	for _, route := range pipeline {
+		routeTags, body, err := route.Handle(env, stdin)
+		if err != nil {
+			if body == "" {
+				body = err.Error()
+			}
+			http.Error(w, body, http.StatusInternalServerError)
+			return
+		}
+
+		halt, err := ApplyBetweenTags(routeTags, tags, &env)
+		if err != nil {
+			log.Print("failed to apply tags")
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		stdin = strings.NewReader(body)
+
+		if halt {
+			break
+		}
+	}
+
+	err := ApplyEndTags(tags, w)
+	if err != nil {
+		log.Print("failed to apply tags")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	io.Copy(w, stdin)
+}
+
+func (pipeline Pipeline) Append(routable Routable) Pipeline {
+	return append(pipeline.Copy(), routable)
+}
+
+func (pipeline Pipeline) Copy() Pipeline {
+	p := make(Pipeline, len(pipeline))
+	copy(p, pipeline)
+	return p
 }
 
 func RequestToEnv(r *http.Request, params httprouter.Params) []string {

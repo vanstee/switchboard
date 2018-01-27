@@ -32,7 +32,8 @@ HTTP_STATUS_CODE: 201
 	)
 	w := httptest.NewRecorder()
 
-	switchboard.ExecutePipeline([]*switchboard.Route{route})(w, req, make(httprouter.Params, 0))
+	pipeline := switchboard.Pipeline{route}
+	pipeline.Handle(w, req, make(httprouter.Params, 0))
 
 	resp := w.Result()
 	if resp.StatusCode != 201 {

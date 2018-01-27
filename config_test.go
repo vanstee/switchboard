@@ -77,9 +77,13 @@ func TestParseConfig(t *testing.T) {
 		}
 
 		for path, troute := range test.routes {
-			route, ok := routes[path]
+			routable, ok := routes[path]
 			if !ok {
 				t.Fatal("route %s not found", path)
+			}
+			route, ok := routable.(*switchboard.Route)
+			if !ok {
+				t.Fatal("routable is not route")
 			}
 			if route.Path != troute.Path {
 				t.Errorf("expected route %s, got route %s", troute.Path, route.Path)

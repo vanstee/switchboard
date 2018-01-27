@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+
+	"github.com/julienschmidt/httprouter"
 )
 
 func NewServer(path string, port int, reload bool) (*http.Server, error) {
@@ -31,6 +33,16 @@ func NewServer(path string, port int, reload bool) (*http.Server, error) {
 		Addr:    fmt.Sprintf(":%d", port),
 		Handler: router,
 	}, nil
+}
+
+func BuildRouter(config *Config) (http.Handler, error) {
+	router := httprouter.New()
+	route := &RootRoute{Routes: config.Routes}
+	err := route.AttachHandlers(router, Pipeline{})
+	if err != nil {
+		return nil, err
+	}
+	return router, nil
 }
 
 func BuildReloadRouter(path string) (http.Handler, error) {
