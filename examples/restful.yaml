@@ -1,0 +1,76 @@
+commands:
+  user:
+    inline: |
+      #!/usr/bin/env ruby
+
+      require "active_record"
+
+      ActiveRecord::Base.logger = nil
+      ActiveRecord::Base.establish_connection(
+        adapter: "sqlite3",
+        database: "users.db"
+      )
+
+      ActiveRecord::Migration.verbose = false
+      ActiveRecord::Schema.define do
+        unless table_exists?(:users)
+          create_table :users do |t|
+            t.column :name, :string
+          end
+        end
+      end
+
+      class User < ActiveRecord::Base
+      end
+
+      def id
+        ENV["HTTP_PARAM_ID"].to_i
+      end
+
+      def params
+        JSON.parse(STDIN.read)["user"]
+      end
+
+      def route
+        "#{ENV["HTTP_METHOD"]} #{ENV["HTTP_URL"]}"
+      end
+
+      def respond(status_code, data)
+        puts "HTTP_CONTENT_TYPE: application/json"
+        puts "HTTP_STATUS_CODE: #{status_code}"
+        puts
+        puts data.to_json
+      end
+
+      case route
+      when "GET /users"
+        users = User.all
+        respond(200, { "users" => users })
+      when "GET /users/#{id}"
+        user = User.find(id)
+        respond(200, { "user" => user })
+      when "POST /users"
+        user = User.create(params)
+        respond(201, { "user" => user })
+      when "PUT /users/#{id}", "PATCH /users/#{id}"
+        user = User.update(id, params)
+        respond(200, { "user" => user })
+      when "DELETE /users/#{id}"
+        User.destroy(id)
+        respond(204, nil)
+      else
+        respond(404, nil)
+      end
+routes:
+  "/users":
+    method:
+      - "GET"
+      - "POST"
+    command: user
+  "/users/:id":
+    method:
+      - "GET"
+      - "PUT"
+      - "PATCH"
+      - "DELETE"
+    command: user

@@ -14,7 +14,7 @@ import (
 type Route struct {
 	Path    string
 	Command *Command
-	Method  string
+	Methods []string
 	Type    string
 	Routes  map[string]*Route
 }
@@ -31,21 +31,23 @@ func BuildRouter(config *Config) (*httprouter.Router, error) {
 }
 
 func BuildRoute(router *httprouter.Router, route *Route, pipeline []*Route) error {
-	if len(route.Routes) == 0 {
-		log.Printf("routing to %s %s", route.Method, route.Path)
-		pipeline = append(pipeline, route)
-		router.Handle(route.Method, route.Path, ExecutePipeline(pipeline))
-		return nil
-	}
+	for _, method := range route.Methods {
+		pl := make([]*Route, len(pipeline))
+		copy(pl, pipeline)
 
-	log.Printf("inserting route in pipeline %s %s", route.Method, route.Path)
-	pipeline = append(pipeline, route)
-	for _, child := range route.Routes {
-		childPipeline := make([]*Route, len(pipeline))
-		copy(childPipeline, pipeline)
-		err := BuildRoute(router, child, childPipeline)
-		if err != nil {
-			return err
+		if route.Path != "*" {
+			log.Printf("routing to %s %s", method, route.Path)
+			pl = append(pl, route)
+			router.Handle(method, route.Path, ExecutePipeline(pl))
+		} else {
+			log.Printf("inserting route in pipeline %s %s", method, route.Path)
+			pl = append(pl, route)
+			for _, child := range route.Routes {
+				err := BuildRoute(router, child, pl)
+				if err != nil {
+					return err
+				}
+			}
 		}
 	}
 	return nil
@@ -54,7 +56,7 @@ func BuildRoute(router *httprouter.Router, route *Route, pipeline []*Route) erro
 func ExecutePipeline(pipeline []*Route) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 		log.Printf("handling route %s", r.URL.Path)
-		env := RequestToEnv(r)
+		env := RequestToEnv(r, params)
 		tags := make(Tags)
 		stdin := io.Reader(r.Body)
 
@@ -108,14 +110,14 @@ func ExecuteRoute(route *Route, env []string, stdin io.Reader) (Tags, string, er
 	}
 
 	if status != 0 {
-		log.Printf("command completed with a nonzero exit status %s", status)
+		log.Printf("command completed with a nonzero exit status %d", status)
 		return nil, string(body), err
 	}
 
 	return routeTags, string(body), nil
 }
 
-func RequestToEnv(r *http.Request) []string {
+func RequestToEnv(r *http.Request, params httprouter.Params) []string {
 	env := []string{
 		fmt.Sprintf("HTTP_METHOD=%s", r.Method),
 		fmt.Sprintf("HTTP_URL=%s", r.URL.String()),
@@ -126,6 +128,14 @@ func RequestToEnv(r *http.Request) []string {
 		k = strings.ToUpper(k)
 		k = fmt.Sprintf("HTTP_HEADER_%s", k)
 		env = append(env, fmt.Sprintf("%s=%s", k, strings.Join(v, ", ")))
+	}
+
+	for _, param := range params {
+		k := param.Key
+		k = strings.Replace(k, "-", "_", -1)
+		k = strings.ToUpper(k)
+		k = fmt.Sprintf("HTTP_PARAM_%s", k)
+		env = append(env, fmt.Sprintf("%s=%s", k, param.Value))
 	}
 
 	return env

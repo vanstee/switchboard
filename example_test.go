@@ -107,6 +107,33 @@ var (
 				},
 			},
 		},
+		{
+			path: "examples/restful.yaml",
+			reqresps: []struct {
+				req  *http.Request
+				resp *http.Response
+			}{
+				{
+					req: &http.Request{
+						Method: "GET",
+						URL:    URLMustParse("http://localhost:8081/users"),
+					},
+					resp: &http.Response{
+						StatusCode: 200,
+						Header: map[string][]string{
+							"Content-Type": []string{
+								"application/json",
+							},
+						},
+						Body: ioutil.NopCloser(
+							strings.NewReader(
+								"{\"users\":[]}\n",
+							),
+						),
+					},
+				},
+			},
+		},
 	}
 )
 

@@ -36,7 +36,7 @@ routes:
 				"/hello": &switchboard.Route{
 					Path:    "/hello",
 					Command: helloCommand,
-					Method:  "GET",
+					Methods: []string{"GET"},
 					Routes:  nil,
 				},
 			},

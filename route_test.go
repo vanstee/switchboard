@@ -22,7 +22,7 @@ HTTP_STATUS_CODE: 201
 { "user": { "id": 1, "name": "Jimmy" } }`,
 			},
 		},
-		Method: "POST",
+		Methods: []string{"POST"},
 	}
 
 	req := httptest.NewRequest(

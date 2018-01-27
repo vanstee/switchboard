@@ -25,6 +25,19 @@ func main() {
 		},
 	}
 
-	app.Action = switchboard.Run
+	app.Commands = []cli.Command{
+		cli.Command{
+			Name:   "serve",
+			Usage:  "",
+			Action: switchboard.Serve,
+		},
+		cli.Command{
+			Name:   "routes",
+			Usage:  "",
+			Action: switchboard.Routes,
+		},
+	}
+
+	app.Action = switchboard.Serve
 	app.Run(os.Args)
 }

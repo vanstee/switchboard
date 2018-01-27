@@ -44,7 +44,7 @@ func LookupDriver(name string) (Driver, error) {
 func (driver LocalDriver) Execute(command *Command, env []string, streams *Streams) (int64, error) {
 	path := command.Command
 	if command.Inline != "" {
-		tmpfile, err := ioutil.TempFile("", "switchboard-inline-command")
+		tmpfile, err := ioutil.TempFile("", fmt.Sprintf("switchboard-inline-command-%s-", command.Name))
 		if err != nil {
 			return -1, err
 		}

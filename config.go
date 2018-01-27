@@ -33,7 +33,7 @@ type CommandYAML struct {
 
 type RouteYAML struct {
 	Command interface{}           `yaml:"command"`
-	Method  string                `yaml:"method"`
+	Method  interface{}           `yaml:"method"`
 	Routes  map[string]*RouteYAML `yaml:"routes"`
 }
 
@@ -151,12 +151,18 @@ func (routeYAML *RouteYAML) ToRoute(path string, commands map[string]*Command) (
 		return nil, malformedErr
 	}
 
-	method := DefaultRouteMethod
-	if routeYAML.Method != "" {
-		method = routeYAML.Method
+	switch method := routeYAML.Method.(type) {
+	case string:
+		route.Methods = []string{method}
+	case []interface{}:
+		methods := make([]string, len(method))
+		for i, m := range method {
+			methods[i] = m.(string)
+		}
+		route.Methods = methods
+	default:
+		route.Methods = []string{DefaultRouteMethod}
 	}
-
-	route.Method = method
 
 	route.Routes = make(map[string]*Route)
 	for childPath, childRouteYAML := range routeYAML.Routes {
