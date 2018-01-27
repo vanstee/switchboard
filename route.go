@@ -19,7 +19,7 @@ type Route struct {
 	Routes  map[string]*Route
 }
 
-func BuildRouter(config *Config) (*httprouter.Router, error) {
+func BuildRouter(config *Config) (http.Handler, error) {
 	router := httprouter.New()
 	for _, route := range config.Routes {
 		err := BuildRoute(router, route, []*Route{})

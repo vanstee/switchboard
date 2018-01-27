@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"path"
 
 	"gopkg.in/yaml.v2"
@@ -175,6 +176,20 @@ func (routeYAML *RouteYAML) ToRoute(path string, commands map[string]*Command) (
 	}
 
 	return route, nil
+}
+
+func ReadConfig(path string) (*Config, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+
+	config, err := ParseConfig(file)
+	if err != nil {
+		return nil, err
+	}
+
+	return config, nil
 }
 
 func JoinPaths(paths ...string) string {

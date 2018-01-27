@@ -23,6 +23,10 @@ func main() {
 			Value:  8080,
 			EnvVar: "PORT",
 		},
+		cli.BoolFlag{
+			Name:   "reload, r",
+			EnvVar: "RELOAD",
+		},
 	}
 
 	app.Commands = []cli.Command{
