@@ -12,7 +12,7 @@ import (
 )
 
 func TestExecuteSimpleCommand(t *testing.T) {
-	route := &switchboard.Route{
+	route := &switchboard.BasicRoute{
 		Path: "/users",
 		Command: &switchboard.Command{
 			Driver: &FakeDriver{

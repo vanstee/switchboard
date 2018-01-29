@@ -12,32 +12,38 @@ import (
 	"github.com/julienschmidt/httprouter"
 )
 
-type Routable interface {
+type Route interface {
 	AttachHandlers(*httprouter.Router, Pipeline) error
 	Handle([]string, io.Reader) (Tags, string, error)
 }
 
-type Route struct {
+type BasicRoute struct {
 	Path    string
 	Command *Command
 	Methods []string
 	Type    string
-	Routes  map[string]Routable
+	Routes  map[string]Route
+}
+
+type ResourceRoute struct {
+	Path    string
+	Command *Command
+	Routes  map[string]Route
 }
 
 type RootRoute struct {
-	Routes map[string]Routable
+	Routes map[string]Route
 }
 
-type Pipeline []Routable
+type Pipeline []Route
 
-func (route *Route) AttachHandlers(router *httprouter.Router, pipeline Pipeline) error {
+func (route *BasicRoute) AttachHandlers(router *httprouter.Router, pipeline Pipeline) error {
 	for _, method := range route.Methods {
 		if len(route.Routes) == 0 {
 			log.Printf("routing to %s %s", method, route.Path)
 			router.Handle(method, route.Path, pipeline.Append(route).Handle)
 		} else {
-			log.Printf("inserting route in pipeline %s %s", method, route.Path)
+			log.Printf("inserting route in pipeline %s", route.Path)
 			for _, child := range route.Routes {
 				err := child.AttachHandlers(router, pipeline.Append(route))
 				if err != nil {
@@ -50,7 +56,56 @@ func (route *Route) AttachHandlers(router *httprouter.Router, pipeline Pipeline)
 	return nil
 }
 
-func (route *Route) Handle(env []string, stdin io.Reader) (Tags, string, error) {
+func (route *BasicRoute) Handle(env []string, stdin io.Reader) (Tags, string, error) {
+	log.Printf("executing command %s for route %s", route.Command.Name, route.Path)
+	status, routeTags, stdout, err := route.Command.Execute(env, stdin)
+	if err != nil {
+		log.Print("failed to execute command: %s", err)
+		return nil, "", err
+	}
+
+	body, err := ioutil.ReadAll(stdout)
+	if err != nil {
+		log.Print("command failed to execute correctly")
+		return nil, "", err
+	}
+
+	if status != 0 {
+		log.Printf("command completed with a nonzero exit status %d", status)
+		return nil, string(body), err
+	}
+
+	return routeTags, string(body), nil
+}
+
+func (route *ResourceRoute) AttachHandlers(router *httprouter.Router, pipeline Pipeline) error {
+	resourcesPath := route.Path
+	resourcePath := fmt.Sprintf("%s/:id", resourcesPath)
+
+	for _, method := range []string{"GET", "POST"} {
+		log.Printf("routing to %s %s", method, resourcesPath)
+		router.Handle(method, resourcesPath, pipeline.Append(route).Handle)
+	}
+
+	for _, method := range []string{"GET", "PUT", "PATCH", "DELETE"} {
+		log.Printf("routing to %s %s", method, resourcePath)
+		router.Handle(method, resourcePath, pipeline.Append(route).Handle)
+	}
+
+	if len(route.Routes) > 0 {
+		log.Printf("inserting route in pipeline %s", route.Path)
+		for _, child := range route.Routes {
+			err := child.AttachHandlers(router, pipeline.Append(route))
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (route *ResourceRoute) Handle(env []string, stdin io.Reader) (Tags, string, error) {
 	log.Printf("executing command %s for route %s", route.Command.Name, route.Path)
 	status, routeTags, stdout, err := route.Command.Execute(env, stdin)
 	if err != nil {
@@ -124,8 +179,8 @@ func (pipeline Pipeline) Handle(w http.ResponseWriter, r *http.Request, params h
 	io.Copy(w, stdin)
 }
 
-func (pipeline Pipeline) Append(routable Routable) Pipeline {
-	return append(pipeline.Copy(), routable)
+func (pipeline Pipeline) Append(route Route) Pipeline {
+	return append(pipeline.Copy(), route)
 }
 
 func (pipeline Pipeline) Copy() Pipeline {

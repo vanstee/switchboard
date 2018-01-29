@@ -63,14 +63,5 @@ commands:
       end
 routes:
   "/users":
-    method:
-      - "GET"
-      - "POST"
-    command: user
-  "/users/:id":
-    method:
-      - "GET"
-      - "PUT"
-      - "PATCH"
-      - "DELETE"
+    type: resource
     command: user

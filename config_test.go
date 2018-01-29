@@ -19,7 +19,7 @@ var (
 	configTests = []struct {
 		body     string
 		commands map[string]*switchboard.Command
-		routes   map[string]*switchboard.Route
+		routes   map[string]switchboard.Route
 	}{
 		{
 			body: `
@@ -32,8 +32,8 @@ routes:
 			commands: map[string]*switchboard.Command{
 				"hello": helloCommand,
 			},
-			routes: map[string]*switchboard.Route{
-				"/hello": &switchboard.Route{
+			routes: map[string]switchboard.Route{
+				"/hello": &switchboard.BasicRoute{
 					Path:    "/hello",
 					Command: helloCommand,
 					Methods: []string{"GET"},
@@ -76,14 +76,18 @@ func TestParseConfig(t *testing.T) {
 			t.Fatalf("expected %d routes, got %d routes", 1, len(routes))
 		}
 
-		for path, troute := range test.routes {
-			routable, ok := routes[path]
+		for path, tiroute := range test.routes {
+			iroute, ok := routes[path]
 			if !ok {
 				t.Fatal("route %s not found", path)
 			}
-			route, ok := routable.(*switchboard.Route)
+			route, ok := iroute.(*switchboard.BasicRoute)
 			if !ok {
-				t.Fatal("routable is not route")
+				t.Fatal("iroute is not a basic route")
+			}
+			troute, ok := tiroute.(*switchboard.BasicRoute)
+			if !ok {
+				t.Fatal("tiroute is not a basic route")
 			}
 			if route.Path != troute.Path {
 				t.Errorf("expected route %s, got route %s", troute.Path, route.Path)

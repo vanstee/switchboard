@@ -13,7 +13,12 @@ import (
 
 const (
 	DefaultCommandDriverName = "local"
-	DefaultRouteMethod       = "GET"
+
+	DefaultRouteMethod = "GET"
+
+	BasicRouteType    = "basic"
+	ResourceRouteType = "resource"
+	DefaultRouteType  = BasicRouteType
 )
 
 var (
@@ -24,7 +29,7 @@ var (
 
 type Config struct {
 	Commands map[string]*Command
-	Routes   map[string]Routable
+	Routes   map[string]Route
 }
 
 type ConfigYAML struct {
@@ -42,6 +47,7 @@ type CommandYAML struct {
 type RouteYAML struct {
 	Command interface{}           `yaml:"command"`
 	Method  interface{}           `yaml:"method"`
+	Type    string                `yaml:"type"`
 	Routes  map[string]*RouteYAML `yaml:"routes"`
 }
 
@@ -68,7 +74,7 @@ func ParseConfig(r io.Reader) (*Config, error) {
 func (configYAML *ConfigYAML) ToConfig() (*Config, error) {
 	config := &Config{
 		Commands: make(map[string]*Command),
-		Routes:   make(map[string]Routable),
+		Routes:   make(map[string]Route),
 	}
 
 	for name, commandYAML := range configYAML.Commands {
@@ -113,19 +119,17 @@ func (commandYAML *CommandYAML) ToCommand(name string) (*Command, error) {
 	return command, nil
 }
 
-func (routeYAML *RouteYAML) ToRoute(path string, commands map[string]*Command) (*Route, error) {
-	route := &Route{Path: path}
-
+func (routeYAML *RouteYAML) ToRoute(path string, commands map[string]*Command) (Route, error) {
+	var command *Command
 	malformedErr := fmt.Errorf("command malformed for route \"%s\"", path)
 
 	switch c := routeYAML.Command.(type) {
 	case string:
-		command, ok := commands[c]
+		var ok bool
+		command, ok = commands[c]
 		if !ok {
 			return nil, fmt.Errorf("command \"%s\" not found", c)
 		}
-
-		route.Command = command
 	case map[interface{}]interface{}:
 		cs := make(map[string]string)
 		for k, v := range c {
@@ -150,40 +154,74 @@ func (routeYAML *RouteYAML) ToRoute(path string, commands map[string]*Command) (
 		}
 
 		name := PathToName(path)
-		command, err := commandYAML.ToCommand(name)
+		var err error
+		command, err = commandYAML.ToCommand(name)
 		if err != nil {
 			return nil, err
 		}
-
-		route.Command = command
 	default:
 		return nil, malformedErr
 	}
 
-	switch method := routeYAML.Method.(type) {
-	case string:
-		route.Methods = []string{method}
-	case []interface{}:
-		methods := make([]string, len(method))
-		for i, m := range method {
-			methods[i] = m.(string)
+	routeType := routeYAML.Type
+	if routeType == "" {
+		routeType = DefaultRouteType
+	}
+
+	switch routeType {
+	case BasicRouteType:
+		route := &BasicRoute{
+			Path:    path,
+			Command: command,
 		}
-		route.Methods = methods
+
+		switch method := routeYAML.Method.(type) {
+		case string:
+			route.Methods = []string{method}
+		case []interface{}:
+			methods := make([]string, len(method))
+			for i, m := range method {
+				methods[i] = m.(string)
+			}
+			route.Methods = methods
+		default:
+			route.Methods = []string{DefaultRouteMethod}
+		}
+
+		route.Routes = make(map[string]Route)
+		for childPath, childRouteYAML := range routeYAML.Routes {
+			path := JoinPaths("/", path, childPath)
+			fmt.Printf("%s\n", path)
+			r, err := childRouteYAML.ToRoute(path, commands)
+			if err != nil {
+				return nil, err
+			}
+			route.Routes[childPath] = r
+		}
+
+		return route, nil
+	case ResourceRouteType:
+		route := &ResourceRoute{
+			Path:    path,
+			Command: command,
+		}
+
+		route.Routes = make(map[string]Route)
+		for childPath, childRouteYAML := range routeYAML.Routes {
+			path := JoinPaths("/", path, ":id", childPath)
+			fmt.Printf("%s\n", path)
+			r, err := childRouteYAML.ToRoute(path, commands)
+			if err != nil {
+				return nil, err
+			}
+			route.Routes[childPath] = r
+		}
+
+		return route, nil
 	default:
-		route.Methods = []string{DefaultRouteMethod}
+		unsupportedRouteType := fmt.Errorf("unsupported route type \"%s\"", routeType)
+		return nil, unsupportedRouteType
 	}
-
-	route.Routes = make(map[string]Routable)
-	for childPath, childRouteYAML := range routeYAML.Routes {
-		path := JoinPaths("/", path, childPath)
-		r, err := childRouteYAML.ToRoute(path, commands)
-		if err != nil {
-			return nil, err
-		}
-		route.Routes[childPath] = r
-	}
-
-	return route, nil
 }
 
 func ReadConfig(path string) (*Config, error) {
