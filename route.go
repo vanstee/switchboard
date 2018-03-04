@@ -60,7 +60,7 @@ func (route *BasicRoute) Handle(env []string, stdin io.Reader) (Tags, string, er
 	log.Printf("executing command %s for route %s", route.Command.Name, route.Path)
 	status, routeTags, stdout, err := route.Command.Execute(env, stdin)
 	if err != nil {
-		log.Print("failed to execute command: %s", err)
+		log.Printf("failed to execute command: %s", err)
 		return nil, "", err
 	}
 

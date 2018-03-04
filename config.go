@@ -1,12 +1,17 @@
 package switchboard
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 	"path"
 	"regexp"
+
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/client"
 
 	"gopkg.in/yaml.v2"
 )
@@ -104,6 +109,12 @@ func (commandYAML *CommandYAML) ToCommand(name string) (*Command, error) {
 	driverName := DefaultCommandDriverName
 	if commandYAML.Driver != "" {
 		driverName = commandYAML.Driver
+	} else {
+		if commandYAML.Image != "" {
+			driverName = "docker"
+		} else {
+			driverName = "local"
+		}
 	}
 
 	driver, err := LookupDriver(driverName)
@@ -115,6 +126,21 @@ func (commandYAML *CommandYAML) ToCommand(name string) (*Command, error) {
 	command.Command = commandYAML.Command
 	command.Image = commandYAML.Image
 	command.Inline = commandYAML.Inline
+
+	if driverName == "docker" {
+		cli, err := client.NewEnvClient()
+		if err != nil {
+			return nil, err
+		}
+
+		cli.NegotiateAPIVersion(context.Background())
+
+		log.Printf("pulling docker image %s\n", command.Image)
+		_, err = cli.ImagePull(context.Background(), command.Image, types.ImagePullOptions{})
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	return command, nil
 }

@@ -1,0 +1,17 @@
+commands:
+  ubuntu:
+    command: /bin/sh -c "cat /etc/*release"
+    image: ubuntu
+  fedora:
+    command: /bin/sh -c "cat /etc/*release"
+    image: fedora
+  alpine:
+    command: /bin/sh -c "cat /etc/*release"
+    image: alpine
+routes:
+  "/ubuntu":
+    command: ubuntu
+  "/fedora":
+    command: fedora
+  "/alpine":
+    command: alpine

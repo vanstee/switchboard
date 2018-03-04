@@ -8,13 +8,13 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"strings"
 	"syscall"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/builder/dockerfile/shell"
 	"github.com/docker/docker/client"
-	"github.com/moby/moby/pkg/stdcopy"
+	"github.com/docker/docker/pkg/stdcopy"
 )
 
 type Driver interface {
@@ -95,11 +95,16 @@ func (driver DockerDriver) Execute(command *Command, env []string, streams *Stre
 		return -1, err
 	}
 
-	// cli.ImagePull(context.Background(), driver.Image)
+	cli.NegotiateAPIVersion(context.Background())
 
 	config := &container.Config{Image: command.Image}
 	if command.Command != "" {
-		config.Cmd = strings.Split(command.Command, " ")
+		s := shell.NewLex('\\')
+		words, err := s.ProcessWords(command.Command, []string{})
+		if err != nil {
+			return -1, err
+		}
+		config.Cmd = words
 	}
 
 	log.Printf("creating container from image %s", command.Image)
