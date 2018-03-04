@@ -1,0 +1,7 @@
+routes:
+  "/hello":
+    command:
+      inline: |
+        #!/usr/bin/env bash
+
+        echo "hello world"
