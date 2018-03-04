@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/julienschmidt/httprouter"
+	"github.com/gorilla/mux"
 )
 
 func NewServer(path string, port int, reload bool) (*http.Server, error) {
@@ -36,7 +36,7 @@ func NewServer(path string, port int, reload bool) (*http.Server, error) {
 }
 
 func BuildRouter(config *Config) (http.Handler, error) {
-	router := httprouter.New()
+	router := mux.NewRouter()
 	route := &RootRoute{Routes: config.Routes}
 	err := route.AttachHandlers(router, Pipeline{})
 	if err != nil {

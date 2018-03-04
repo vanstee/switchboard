@@ -4,12 +4,12 @@ routes:
       inline: |
         echo "DEBUG: /*"
     routes:
-      "/articles/:article_id":
+      "/articles/{article_id}":
         command:
           inline: |
-            echo "DEBUG: /articles/:article_id"
+            echo "DEBUG: /articles/{article_id}"
         routes:
-          "/comments/:comment_id":
+          "/comments/{comment_id}":
             command:
               inline: |
-                echo "DEBUG: /comments/:comment_id"
+                echo "DEBUG: /comments/{comment_id}"

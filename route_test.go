@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/julienschmidt/httprouter"
 	"github.com/vanstee/switchboard"
 )
 
@@ -33,7 +32,7 @@ HTTP_STATUS_CODE: 201
 	w := httptest.NewRecorder()
 
 	pipeline := switchboard.Pipeline{route}
-	pipeline.Handle(w, req, make(httprouter.Params, 0))
+	pipeline.Handle(w, req)
 
 	resp := w.Result()
 	if resp.StatusCode != 201 {

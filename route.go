@@ -9,11 +9,11 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/julienschmidt/httprouter"
+	"github.com/gorilla/mux"
 )
 
 type Route interface {
-	AttachHandlers(*httprouter.Router, Pipeline) error
+	AttachHandlers(*mux.Router, Pipeline) error
 	Handle([]string, io.Reader) (Tags, string, error)
 }
 
@@ -37,11 +37,11 @@ type RootRoute struct {
 
 type Pipeline []Route
 
-func (route *BasicRoute) AttachHandlers(router *httprouter.Router, pipeline Pipeline) error {
+func (route *BasicRoute) AttachHandlers(router *mux.Router, pipeline Pipeline) error {
 	for _, method := range route.Methods {
 		if len(route.Routes) == 0 {
 			log.Printf("routing to %s %s", method, route.Path)
-			router.Handle(method, route.Path, pipeline.Append(route).Handle)
+			router.HandleFunc(route.Path, pipeline.Append(route).Handle).Methods(method)
 		} else {
 			log.Printf("inserting route in pipeline %s", route.Path)
 			for _, child := range route.Routes {
@@ -78,18 +78,18 @@ func (route *BasicRoute) Handle(env []string, stdin io.Reader) (Tags, string, er
 	return routeTags, string(body), nil
 }
 
-func (route *ResourceRoute) AttachHandlers(router *httprouter.Router, pipeline Pipeline) error {
+func (route *ResourceRoute) AttachHandlers(router *mux.Router, pipeline Pipeline) error {
 	resourcesPath := route.Path
 	resourcePath := fmt.Sprintf("%s/:id", resourcesPath)
 
 	for _, method := range []string{"GET", "POST"} {
 		log.Printf("routing to %s %s", method, resourcesPath)
-		router.Handle(method, resourcesPath, pipeline.Append(route).Handle)
+		router.HandleFunc(resourcesPath, pipeline.Append(route).Handle).Methods(method)
 	}
 
 	for _, method := range []string{"GET", "PUT", "PATCH", "DELETE"} {
 		log.Printf("routing to %s %s", method, resourcePath)
-		router.Handle(method, resourcePath, pipeline.Append(route).Handle)
+		router.HandleFunc(resourcePath, pipeline.Append(route).Handle).Methods(method)
 	}
 
 	if len(route.Routes) > 0 {
@@ -127,7 +127,7 @@ func (route *ResourceRoute) Handle(env []string, stdin io.Reader) (Tags, string,
 	return routeTags, string(body), nil
 }
 
-func (route *RootRoute) AttachHandlers(router *httprouter.Router, pipeline Pipeline) error {
+func (route *RootRoute) AttachHandlers(router *mux.Router, pipeline Pipeline) error {
 	for _, child := range route.Routes {
 		child.AttachHandlers(router, pipeline.Copy())
 	}
@@ -139,9 +139,9 @@ func (route *RootRoute) Handle([]string, io.Reader) (Tags, string, error) {
 	return nil, "", errors.New("root route cannot be executed")
 }
 
-func (pipeline Pipeline) Handle(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+func (pipeline Pipeline) Handle(w http.ResponseWriter, r *http.Request) {
 	log.Printf("handling route %s", r.URL.Path)
-	env := RequestToEnv(r, params)
+	env := RequestToEnv(r)
 	tags := make(Tags)
 	stdin := io.Reader(r.Body)
 
@@ -189,10 +189,32 @@ func (pipeline Pipeline) Copy() Pipeline {
 	return p
 }
 
-func RequestToEnv(r *http.Request, params httprouter.Params) []string {
+func RequestToEnv(r *http.Request) []string {
+	r.URL.Host = r.Host
+	r.URL.Scheme = "http"
+	if r.TLS != nil {
+		r.URL.Scheme = "https"
+	}
+
 	env := []string{
 		fmt.Sprintf("HTTP_METHOD=%s", r.Method),
 		fmt.Sprintf("HTTP_URL=%s", r.URL.String()),
+		fmt.Sprintf("HTTP_URL_SCHEME=%s", r.URL.Scheme),
+		fmt.Sprintf("HTTP_URL_HOST=%s", r.URL.Host),
+		fmt.Sprintf("HTTP_URL_PORT=%s", r.URL.Port()),
+		fmt.Sprintf("HTTP_URL_PATH=%s", r.URL.Path),
+		fmt.Sprintf("HTTP_URL_QUERY=%s", r.URL.RawQuery),
+		fmt.Sprintf("HTTP_URL_FRAGMENT=%s", r.URL.Fragment),
+	}
+
+	if r.URL.User != nil {
+		username := r.URL.User.Username()
+		env = append(env, fmt.Sprintf("HTTP_URL_USERNAME=%s", username))
+
+		password, ok := r.URL.User.Password()
+		if ok {
+			env = append(env, fmt.Sprintf("HTTP_URL_PASSWORD=%s", password))
+		}
 	}
 
 	for k, v := range r.Header {
@@ -202,12 +224,11 @@ func RequestToEnv(r *http.Request, params httprouter.Params) []string {
 		env = append(env, fmt.Sprintf("%s=%s", k, strings.Join(v, ", ")))
 	}
 
-	for _, param := range params {
-		k := param.Key
-		k = strings.Replace(k, "-", "_", -1)
-		k = strings.ToUpper(k)
-		k = fmt.Sprintf("HTTP_PARAM_%s", k)
-		env = append(env, fmt.Sprintf("%s=%s", k, param.Value))
+	for key, value := range mux.Vars(r) {
+		key = strings.Replace(key, "-", "_", -1)
+		key = strings.ToUpper(key)
+		key = fmt.Sprintf("HTTP_PARAM_%s", key)
+		env = append(env, fmt.Sprintf("%s=%s", key, value))
 	}
 
 	return env

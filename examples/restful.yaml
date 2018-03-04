@@ -32,7 +32,7 @@ commands:
       end
 
       def route
-        "#{ENV["HTTP_METHOD"]} #{ENV["HTTP_URL"]}"
+        "#{ENV["HTTP_METHOD"]} #{ENV["HTTP_URL_PATH"]}"
       end
 
       def respond(status_code, data)

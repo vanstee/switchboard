@@ -2,16 +2,22 @@ package switchboard
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/urfave/cli"
 )
 
 func Serve(c *cli.Context) error {
-	server, err := NewServer(c.GlobalString("config"), c.Int("port"), c.Bool("reload"))
+	config := c.GlobalString("config")
+	port := c.Int("port")
+	reload := c.Bool("reload")
+
+	server, err := NewServer(config, port, reload)
 	if err != nil {
 		return cli.NewExitError(err.Error(), 1)
 	}
 
+	log.Printf("starting http server on port %d", port)
 	err = server.ListenAndServe()
 	return cli.NewExitError(err.Error(), 1)
 }
